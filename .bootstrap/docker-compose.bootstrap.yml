@@ -1,0 +1,16 @@
+services:
+  bootstrap:
+    build: 
+      context: ../
+      dockerfile: ./.bootstrap/Dockerfile.bootstrap
+      args:
+        - NODE_VERSION=${NODE_VERSION}
+    volumes:
+      - ..:/app/bootstrap:delegated
+      - volume-pnpm-store:/app/bootstrap/.pnpm-store
+    working_dir: /app/bootstrap
+    env_file:
+      - ../.env
+
+volumes:
+  volume-pnpm-store: 

@@ -12,7 +12,6 @@ services:
       - ../..:/app/infrastructure:delegated
       - volume-pnpm-store:/app/infrastructure/.pnpm-store
       - volume-aws-credentials:/root/.aws
-      - ./bootstrap.sh:/app/infrastructure/bootstrap.sh:ro
     working_dir: /app/infrastructure
     env_file:
       - ../../.env

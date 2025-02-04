@@ -17,14 +17,10 @@ DOCKER_COMPOSE_FILE = $(DOCKER_COMPOSE_DIR)/docker-compose.dev.yml
 COMPOSE = docker compose --file $(DOCKER_COMPOSE_FILE)
 RUN_IN_DEV_ENV = $(COMPOSE) run --rm --service-ports $(DOCKER_IMAGE_NAME)
 
-.PHONY: install clean dev run bootstrap synth diff deploy destroy
+.PHONY: install install-force dev bash run clean 
 
-bootstrap: ## bootstrap the environment by initializing project with the configured package manager
-	$(RUN_IN_DEV_ENV) /app/infrastructure/docker/dev/bootstrap.sh
-	@make install
-
-install: create-env-file-if-missing verify-env docker-build aws-configure-check ## Install everything needed for development
-install-force: create-env-file-if-missing verify-env docker-build-force aws-configure ## Install everything needed for development
+install: verify-env docker-build npm-install aws-configure-check ## Install everything needed for development
+install-force: verify-env docker-build-force npm-install aws-configure ## Install everything needed for development
 
 dev: ## Start a development shell (alias to bash)
 	@$(MAKE) bash
@@ -40,6 +36,8 @@ bash: verify-env ## Start a development shell
 	
 run: ## Run arbitrary command in dev-env container eg. make run cmd="npm run test"
 	$(RUN_IN_DEV_ENV) $(cmd)
+	@echo "Cleaning up unused containers..."; \
+	$(COMPOSE) down --remove-orphans; \
 
 clean: npm-clean docker-clean ## Clean everything (containers, dependencies, generated files)
 
@@ -132,25 +130,11 @@ corepack-upgrade: ## Upgrade corepack to the latest version (use when you see th
 help: ## Display this help
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
-create-env-file-if-missing: ## Create a .env file if it doesn't exist
-	@if [ ! -f .env ]; then \
-		echo ".env file not found. Creating from template..."; \
-		cp .env.example .env; \
-		echo "Please fill in the .env file with your own values then rerun your command."; \
-		exit 1; \
-	fi
 
 verify-env: ## Verify environment variables are set
 	@echo "Verifying environment variables..."
 	@test -n "$(AWS_PROFILE)" || (echo "AWS_PROFILE is not set" && exit 1)
 	@test -n "$(PACKAGE_MANAGER)" || (echo "PACKAGE_MANAGER is not set" && exit 1)
 	@echo "Environment variables verified ✓"
-
-verify-need-bootstrap: ## Throw if the project has not been bootstrapped (no package.json)
-	@if [ ! -f .bootstrap ]; then \
-		echo "if you just cloned this repo, you must run 'make bootstrap' first"; \
-		exit 1; \
-	fi
-
 
 .DEFAULT_GOAL := help 

@@ -33,16 +33,9 @@ RUN if [ "$(uname -m)" = "x86_64" ]; then \
 # Install AWS CDK CLI globally 
 RUN npm install -g aws-cdk corepack
 
-# Don't fail if package.json doesn't exist, but copy it if it does
-COPY package.json* ./
-
-# Enable corepack (but don't prepare any package manager yet)
-# if jq -e '.packageManager' package.json > /dev/null 2>&1; then \
+# Enable corepack
+COPY package.json ./
 RUN corepack enable && \
-    if [ -f "package.json" ]; then \
-    corepack prepare --activate; \
-    else \
-    echo "No package.json found, will be created during bootstrap"; \
-    fi
+    corepack prepare --activate; 
 
 CMD ["bash"] 
