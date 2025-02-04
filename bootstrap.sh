@@ -76,7 +76,6 @@ clean_up() {
     rm -rf ./.bootstrap
     rm -f ./README.md
     mv ./README.final.md ./README.md
-    rm -f ./bootstrap.sh
 }
 
 bootstrap() {

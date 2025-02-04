@@ -20,7 +20,8 @@ The main benefits are:
 ```bash
 git clone git@github.com:PaulSenon/tpl-aws-cdk-dockerized-dev-env.git YOUR_PROJECT_NAME && \
 cd YOUR_PROJECT_NAME && \
-./bootstrap.sh
+./bootstrap.sh && \
+rm ./bootstrap.sh
 ```
 
 ## Contributions
