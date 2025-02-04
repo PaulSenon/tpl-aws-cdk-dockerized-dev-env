@@ -76,6 +76,9 @@ clean_up() {
     rm -rf ./.bootstrap
     rm -f ./README.md
     mv ./README.final.md ./README.md
+    rm -rf .git
+    echo ".pnpm-store" >> .gitignore
+    echo ".env" >> .gitignore
 }
 
 bootstrap() {
