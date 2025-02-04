@@ -21,6 +21,7 @@ RUN_IN_DEV_ENV = $(COMPOSE) run --rm --service-ports $(DOCKER_IMAGE_NAME)
 
 bootstrap: ## bootstrap the environment by initializing project with the configured package manager
 	$(RUN_IN_DEV_ENV) /app/infrastructure/docker/dev/bootstrap.sh
+	@make install
 
 install: create-env-file-if-missing verify-env docker-build aws-configure-check ## Install everything needed for development
 install-force: create-env-file-if-missing verify-env docker-build-force aws-configure ## Install everything needed for development
@@ -144,5 +145,12 @@ verify-env: ## Verify environment variables are set
 	@test -n "$(AWS_PROFILE)" || (echo "AWS_PROFILE is not set" && exit 1)
 	@test -n "$(PACKAGE_MANAGER)" || (echo "PACKAGE_MANAGER is not set" && exit 1)
 	@echo "Environment variables verified ✓"
+
+verify-need-bootstrap: ## Throw if the project has not been bootstrapped (no package.json)
+	@if [ ! -f .bootstrap ]; then \
+		echo "if you just cloned this repo, you must run 'make bootstrap' first"; \
+		exit 1; \
+	fi
+
 
 .DEFAULT_GOAL := help 

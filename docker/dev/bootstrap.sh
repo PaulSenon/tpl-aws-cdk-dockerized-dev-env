@@ -63,9 +63,12 @@ initialize_project() {
 
 # Main script
 # if ! jq -e '.packageManager' package.json > /dev/null 2>&1; then
-if [ ! -f "package.json" ]; then
-    echo "📝 No package manager configured. Setting up project..."
+if [ -f ".bootstrap" ]; then
+    echo "📝 Bootstrapping project..."
     select_package_manager
     initialize_project
     echo "✨ Project initialization complete!"
+    rm -f .bootstrap
+else
+    echo "✨ Project already bootstrapped!"
 fi
