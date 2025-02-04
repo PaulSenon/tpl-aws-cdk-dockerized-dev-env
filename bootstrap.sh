@@ -73,8 +73,10 @@ make_install() {
 clean_up() {
     echo "🧹 Cleaning up..."
     NODE_VERSION=${NODE_VERSION} docker compose --file .bootstrap/docker-compose.bootstrap.yml down --rmi all --volumes --remove-orphans
-#     rm -rf ./.bootstrap
-#     rm -f ./bootstrap.sh
+    rm -rf ./.bootstrap
+    rm -f ./README.md
+    mv ./README.final.md ./README.md
+    rm -f ./bootstrap.sh
 }
 
 bootstrap() {

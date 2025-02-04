@@ -10,6 +10,7 @@ initialize_cdk_project() {
     mkdir -p myApp
     cd myApp
     cdk init app --language typescript --generate-only
+    rm README.md
     cp -r . $PROJECT_DIR
     cd $PROJECT_DIR
     rm -rf $TEMP_DIR_CDK
