@@ -10,10 +10,10 @@ select_node_version() {
     echo "📦 Select node major version"
     
     # Initialize NODE_VERSION with default
-    NODE_VERSION="latest"
+    NODE_VERSION="lts"
     
     # Prompt for input
-    echo "Enter node version (latest):"
+    echo "Enter node version (lts):"
     read choice
     
     # Only override default if user entered something
@@ -65,9 +65,9 @@ bootstrap_from_container() {
     NODE_VERSION=${NODE_VERSION} docker compose --file .bootstrap/docker-compose.bootstrap.yml run --rm --service-ports bootstrap /app/bootstrap.docker.sh
 }
 
-make_install() {
-    echo "🔧 Installing dependencies..."    
-    make install
+prompt_make_install() {
+    echo "🔧 Bootstrap complete!"
+    echo "you can now run 'make install' to install the project and start developing"    
 }
 
 clean_up() {
@@ -78,7 +78,8 @@ clean_up() {
     mv ./README.final.md ./README.md
     rm -rf .git
     echo ".pnpm-store" >> .gitignore
-    echo ".env" >> .gitignore
+    echo ".env.*.local" >> .gitignore
+    echo ".env.local" >> .gitignore
 }
 
 bootstrap() {
@@ -86,8 +87,8 @@ bootstrap() {
     select_node_version
     select_package_manager
     bootstrap_from_container
-    make_install
     clean_up
+    prompt_make_install
 }
 
 bootstrap
