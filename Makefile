@@ -1,12 +1,15 @@
-
 # Set Bash as the shell so that Bash-specific syntax works
 SHELL := /bin/bash
 
-# Load environment variables from .env file
-ifneq (,$(wildcard ./.env))
-	include .env
-	export
-endif
+# Load environment variables in order of precedence (later files override earlier ones)
+# The -include directive will silently ignore missing files
+-include .env
+-include .env.local
+
+# Export all variables
+export
+
+.PHONY: install clean dev run aws-configure-check aws-configure aws-login cdk-bootstrap cdk-synth cdk-diff cdk-deploy cdk-destroy
 
 # Docker configuration
 DOCKER_COMPOSE_DIR = docker/dev
@@ -17,30 +20,38 @@ DOCKER_COMPOSE_FILE = $(DOCKER_COMPOSE_DIR)/docker-compose.dev.yml
 COMPOSE = docker compose --file $(DOCKER_COMPOSE_FILE)
 RUN_IN_DEV_ENV = $(COMPOSE) run --rm --service-ports $(DOCKER_IMAGE_NAME)
 
-.PHONY: install install-force dev bash run clean 
+# Helper function to run commands in dev container
+define run_in_dev_container_smart
+	@if [ $$( $(COMPOSE) ps --status running --services | grep -c $(DOCKER_IMAGE_NAME)) -gt 0 ]; then \
+		echo "Dev container already running, executing directly..."; \
+		$(COMPOSE) exec $(DOCKER_IMAGE_NAME) $(1); \
+	else \
+		echo "Starting dev container and running command..."; \
+		$(RUN_IN_DEV_ENV) $(1) && \
+		echo "Stopping dev container..."; \
+		$(MAKE) stop; \
+	fi
+endef
 
-install: verify-env docker-build npm-install aws-configure-check ## Install everything needed for development
-install-force: verify-env docker-build-force npm-install aws-configure ## Install everything needed for development
+.PHONY: install install-force dev bash run clean stop
+
+install: create-env-files verify-env docker-build npm-install aws-configure-check ## Install everything needed for development
+install-force: create-env-files verify-env docker-build-force npm-install aws-configure ## Install everything needed for development
+
+stop: ## Stop all containers
+	@echo "Cleaning up unused containers..."; \
+	$(COMPOSE) down --remove-orphans
 
 dev: ## Start a development shell (alias to bash)
 	@$(MAKE) bash
 
 bash: verify-env ## Start a development shell
-	@if [ $$( $(COMPOSE) ps --status running --services | grep -c cdk) -gt 0 ]; then \
-		echo "cdk container is already running you should stop it first. If you want to force it down, use 'make stop'"; \
-		exit 1; \
-	fi
-	$(RUN_IN_DEV_ENV) bash
-	@echo "Cleaning up unused containers..."; \
-	$(COMPOSE) down --remove-orphans; \
-	
+	$(call run_in_dev_container_smart,bash)
+
 run: ## Run arbitrary command in dev-env container eg. make run cmd="npm run test"
-	$(RUN_IN_DEV_ENV) $(cmd)
-	@echo "Cleaning up unused containers..."; \
-	$(COMPOSE) down --remove-orphans; \
+	$(call run_in_dev_container_smart,$(cmd))
 
 clean: npm-clean docker-clean ## Clean everything (containers, dependencies, generated files)
-
 
 # AWS CLI Commands
 aws-configure-check: ## Check if AWS profile is configured (fallback on aws-configure if not)
@@ -72,24 +83,23 @@ aws-configure: ## Configure AWS profile (sso or access key & secret)
 	exit 0
 
 aws-login:
-	$(RUN_IN_DEV_ENV) aws sso login --profile $(AWS_PROFILE) --use-device-code --no-browser
-
+	$(call run_in_dev_container_smart,aws sso login --profile $(AWS_PROFILE) --use-device-code --no-browser)
 
 # CDK commands
 cdk-bootstrap: ## Bootstrap CDK in your AWS account
-	$(RUN_IN_DEV_ENV) $(PACKAGE_MANAGER) cdk bootstrap
+	$(call run_in_dev_container_smart,$(PACKAGE_MANAGER) cdk bootstrap)
 
 cdk-synth: ## Synthesize CloudFormation template
-	$(RUN_IN_DEV_ENV) $(PACKAGE_MANAGER) cdk synth
+	$(call run_in_dev_container_smart,$(PACKAGE_MANAGER) cdk synth)
 
 cdk-diff: ## Show changes to be deployed
-	$(RUN_IN_DEV_ENV) $(PACKAGE_MANAGER) cdk diff
+	$(call run_in_dev_container_smart,$(PACKAGE_MANAGER) cdk diff)
 
 cdk-deploy: ## Deploy the CDK stack
-	$(RUN_IN_DEV_ENV) $(PACKAGE_MANAGER) cdk deploy --require-approval never
+	$(call run_in_dev_container_smart,$(PACKAGE_MANAGER) cdk deploy --require-approval never)
 
 cdk-destroy: ## Destroy the CDK stack
-	$(RUN_IN_DEV_ENV) $(PACKAGE_MANAGER) cdk destroy --force
+	$(call run_in_dev_container_smart,$(PACKAGE_MANAGER) cdk destroy --force)
 
 
 # Docker commands
@@ -111,30 +121,36 @@ docker-down: ## Stop all containers ()
 
 # Node package manager commands (run inside container)
 npm-install: ## Install dependencies
-	$(RUN_IN_DEV_ENV) $(PACKAGE_MANAGER) install
+	$(call run_in_dev_container_smart,$(PACKAGE_MANAGER) install)
 
 npm-upgrade: ## Upgrade all dependencies
-	$(RUN_IN_DEV_ENV) $(PACKAGE_MANAGER) upgrade
-	$(RUN_IN_DEV_ENV) $(PACKAGE_MANAGER) install
+	$(call run_in_dev_container_smart,$(PACKAGE_MANAGER) upgrade && $(PACKAGE_MANAGER) install)
 
 npm-clean: ## Clean dependencies and generated files
-	$(RUN_IN_DEV_ENV) $(PACKAGE_MANAGER) run clean
+	$(call run_in_dev_container_smart,$(PACKAGE_MANAGER) run clean)
 
 
 # Miscellaneous Commands
 corepack-upgrade: ## Upgrade corepack to the latest version (use when you see that a newer version current package manager is available)
-	$(RUN_IN_DEV_ENV) corepack up
+	$(call run_in_dev_container_smart,corepack up)
 
 
 # Internal Utility Commands
-help: ## Display this help
-	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
-
+create-env-files: ## Create a .env file for development
+	@if [ ! -f .env.local ]; then \
+		echo "#######################################################" > .env.local; \
+		echo "# LOCAL SECRETS ONLY SHOULD NEVER BE COMMITTED        #" >> .env.local; \
+		echo "# -> for non sensitive envs, use the .env file        #" >> .env.local; \
+		echo "#######################################################" >> .env.local; \
+	fi
 
 verify-env: ## Verify environment variables are set
 	@echo "Verifying environment variables..."
 	@test -n "$(AWS_PROFILE)" || (echo "AWS_PROFILE is not set" && exit 1)
 	@test -n "$(PACKAGE_MANAGER)" || (echo "PACKAGE_MANAGER is not set" && exit 1)
 	@echo "Environment variables verified ✓"
+
+help: ## Display this help
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 .DEFAULT_GOAL := help 
