@@ -80,7 +80,6 @@ aws-configure: ## Configure AWS profile (sso or access key & secret)
 			exit 1;; \
 	esac
 	@echo "✓ AWS profile configured"
-	exit 0
 
 aws-login:
 	$(call run_in_dev_container_smart,aws sso login --profile $(AWS_PROFILE) --use-device-code --no-browser)
